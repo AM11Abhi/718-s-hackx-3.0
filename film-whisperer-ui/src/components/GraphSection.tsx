@@ -1,6 +1,8 @@
-import { MousePointer2, Sparkles } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { MousePointer2, Sparkles, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
+import { getMovieByTitle, convertTMDBToAppMovie } from "@/services/tmdb";
+import { useToast } from "@/hooks/use-toast";
 
 interface Movie {
   title: string;
@@ -12,6 +14,10 @@ interface Movie {
   trailer_url: string;
   similarity_score: number;
   reason_for_recommendation: string[];
+  runtime?: number;
+  rating?: number;
+  tagline?: string;
+  backdrop_url?: string;
 }
 
 interface GraphSectionProps {
@@ -21,6 +27,52 @@ interface GraphSectionProps {
 
 const GraphSection = ({ movies, onMovieClick }: GraphSectionProps) => {
   const graphRef = useRef<any>();
+  const [loadingMovie, setLoadingMovie] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Handle movie node click with TMDB API fetch
+  const handleMovieNodeClick = async (node: any) => {
+    if (node.type !== "movie" || !node.data) return;
+    
+    setLoadingMovie(node.data.title);
+    
+    try {
+      // Fetch movie details from TMDB API
+      const tmdbMovie = await getMovieByTitle(node.data.title);
+      
+      if (tmdbMovie) {
+        // Convert TMDB data to app format
+        const enrichedMovie = convertTMDBToAppMovie(tmdbMovie, node.data.similarity_score);
+        onMovieClick(enrichedMovie);
+        
+        toast({
+          title: "Movie loaded",
+          description: `Fetched details for "${node.data.title}" from TMDB`,
+        });
+      } else {
+        // Fallback to original data if TMDB fetch fails
+        onMovieClick(node.data);
+        
+        toast({
+          title: "Using cached data",
+          description: `Could not fetch fresh data for "${node.data.title}"`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching movie from TMDB:", error);
+      // Fallback to original data
+      onMovieClick(node.data);
+      
+      toast({
+        title: "Error loading movie",
+        description: "Using cached movie data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMovie(null);
+    }
+  };
 
   // Prepare graph data
   const graphData = {
@@ -103,10 +155,19 @@ const GraphSection = ({ movies, onMovieClick }: GraphSectionProps) => {
 
         {/* Graph Container */}
         <div className="relative rounded-3xl overflow-hidden border-2 border-border bg-card/50 backdrop-blur-sm">
-          {/* Interactive Hint */}
+          {/* Interactive Hint / Loading Indicator */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 bg-background/90 backdrop-blur-md border border-border rounded-full shadow-lg">
-            <MousePointer2 className="w-4 h-4 text-primary animate-pulse" />
-            <span className="text-sm font-medium">Click nodes to explore</span>
+            {loadingMovie ? (
+              <>
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                <span className="text-sm font-medium">Loading {loadingMovie}...</span>
+              </>
+            ) : (
+              <>
+                <MousePointer2 className="w-4 h-4 text-primary animate-pulse" />
+                <span className="text-sm font-medium">Click nodes to explore</span>
+              </>
+            )}
           </div>
 
           {/* Graph */}
@@ -126,11 +187,7 @@ const GraphSection = ({ movies, onMovieClick }: GraphSectionProps) => {
                 ctx.fillStyle = node.type === "movie" ? "#f5f5f5" : "#999";
                 ctx.fillText(label, node.x, node.y + 15);
               }}
-              onNodeClick={(node: any) => {
-                if (node.type === "movie" && node.data) {
-                  onMovieClick(node.data);
-                }
-              }}
+              onNodeClick={handleMovieNodeClick}
               linkColor={() => "rgba(255, 255, 255, 0.1)"}
               linkWidth={1}
               backgroundColor="rgba(0, 0, 0, 0)"

@@ -12,6 +12,10 @@ interface Movie {
   trailer_url: string;
   similarity_score: number;
   reason_for_recommendation: string[];
+  runtime?: number;
+  rating?: number;
+  tagline?: string;
+  backdrop_url?: string;
 }
 
 interface MovieModalProps {
@@ -92,6 +96,9 @@ const MovieModal = ({ movie, onClose }: MovieModalProps) => {
               <h2 className="text-4xl font-display font-bold leading-tight">
                 {movie.title}
               </h2>
+              {movie.tagline && (
+                <p className="text-lg text-accent italic">{movie.tagline}</p>
+              )}
               <div className="flex flex-wrap gap-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="w-4 h-4" />
@@ -101,6 +108,18 @@ const MovieModal = ({ movie, onClose }: MovieModalProps) => {
                   <User className="w-4 h-4" />
                   <span>{movie.director}</span>
                 </div>
+                {movie.runtime && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Film className="w-4 h-4" />
+                    <span>{movie.runtime} min</span>
+                  </div>
+                )}
+                {movie.rating && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Star className="w-4 h-4 fill-accent text-accent" />
+                    <span>{movie.rating.toFixed(1)}/10</span>
+                  </div>
+                )}
               </div>
             </div>
 
