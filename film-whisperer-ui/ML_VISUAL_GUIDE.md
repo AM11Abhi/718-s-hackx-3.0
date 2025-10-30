@@ -9,39 +9,44 @@
                                  │
                                  ▼
                     ┌────────────────────────┐
-                    │   User enters query:   │
-                    │ "Dark thriller movies" │
+                    │  User loads/searches   │
+                    │    for movies          │
                     └────────────┬───────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         FRONTEND (React)                             │
 │                                                                      │
-│  1. Capture query from search input                                 │
-│  2. Show loading state                                              │
-│  3. POST to ML API endpoint                                         │
+│  1. Show loading state                                              │
+│  2. GET http://localhost:8000/api/v1/graph                          │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         ML BACKEND API                               │
+│                    BACKEND API (FastAPI)                             │
 │                                                                      │
-│  POST /api/recommend                                                │
-│  {                                                                   │
-│    "query": "Dark thriller movies",                                 │
-│    "num_recommendations": 10                                        │
-│  }                                                                   │
+│  GET /api/v1/graph                                                  │
 │                                                                      │
-│  ▼ Process with ML Model                                            │
+│  ▼ Query Neo4j database                                             │
 │                                                                      │
 │  Response:                                                           │
 │  {                                                                   │
-│    "status": "success",                                             │
-│    "recommended_movies": [...],  ◄─── Primary data                 │
-│    "graph_data": {              ◄─── Graph visualization           │
-│      "nodes": [...],                                                │
-│      "edges": [...]                                                 │
-│    }                                                                 │
+│    "nodes": [                    ◄─── All nodes                    │
+│      {                                                              │
+│        "id": "Inception",                                           │
+│        "name": "Inception",                                         │
+│        "type": "movie",                                             │
+│        "data": { movie details }                                    │
+│      },                                                             │
+│      ...genres, directors                                           │
+│    ],                                                               │
+│    "links": [                    ◄─── All relationships            │
+│      {                                                              │
+│        "source": "Inception",                                       │
+│        "target": "Sci-Fi"                                           │
+│      },                                                             │
+│      ...                                                            │
+│    ]                                                                │
 │  }                                                                   │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
@@ -49,20 +54,20 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    FRONTEND DATA PROCESSING                          │
 │                                                                      │
-│  1. Parse recommended_movies[]                                      │
-│  2. Build graph structure (nodes + edges)                           │
-│  3. Render interactive graph visualization                          │
+│  1. Receive nodes and links                                         │
+│  2. Pass directly to graph visualization                            │
+│  3. Extract movie nodes (type === "movie")                          │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       DISPLAY: GRAPH VIEW                            │
 │                                                                      │
-│           🔴 Movie Nodes (clickable)                                │
-│           🟠 Genre Nodes                                            │
-│           ⚪ Director Nodes                                         │
+│           🔴 Movie Nodes (clickable) - type: "movie"                │
+│           🟠 Genre Nodes - type: "genre"                            │
+│           ⚪ Director Nodes - type: "director"                      │
 │                                                                      │
-│           Lines connect related items                                │
+│           Lines connect based on links array                         │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                       User clicks movie node
@@ -71,8 +76,8 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    OPTIONAL: TMDB ENRICHMENT                         │
 │                                                                      │
-│  IF tmdb_id provided → Fetch fresh data from TMDB                  │
-│  ELSE → Search by title on TMDB                                     │
+│  Extract node.data (movie details)                                  │
+│  Search TMDB by title                                               │
 │                                                                      │
 │  Get: poster, backdrop, trailer, rating, runtime                    │
 └────────────────────────────────┬────────────────────────────────────┘
@@ -175,49 +180,66 @@ Movie ──────────> Theme
 
 ---
 
-## 📝 Example: From ML Data to Display
+## 📝 Example: From Backend Data to Display
 
-### Input (ML API Response):
+### Input (Backend API Response):
 ```json
 {
-  "recommended_movies": [
+  "nodes": [
     {
-      "title": "The Silence of the Lambs",
-      "year": 1991,
-      "director": "Jonathan Demme",
-      "genres": ["Thriller", "Crime", "Drama"],
-      "similarity_score": 0.88,
-      "reason_for_recommendation": [
-        "Iconic psychological thriller",
-        "Serial killer investigation"
-      ]
+      "id": "The Silence of the Lambs",
+      "name": "The Silence of the Lambs",
+      "type": "movie",
+      "data": {
+        "title": "The Silence of the Lambs",
+        "year": 1991,
+        "director": "Jonathan Demme",
+        "genres": ["Thriller", "Crime", "Drama"],
+        "similarity_score": 0.88,
+        "reason_for_recommendation": [
+          "Iconic psychological thriller",
+          "Serial killer investigation"
+        ]
+      }
+    },
+    {
+      "id": "Thriller",
+      "name": "Thriller",
+      "type": "genre",
+      "data": null
+    },
+    {
+      "id": "Crime",
+      "name": "Crime",
+      "type": "genre",
+      "data": null
+    },
+    {
+      "id": "Jonathan Demme",
+      "name": "Jonathan Demme",
+      "type": "director",
+      "data": null
     }
+  ],
+  "links": [
+    { "source": "The Silence of the Lambs", "target": "Thriller" },
+    { "source": "The Silence of the Lambs", "target": "Crime" },
+    { "source": "The Silence of the Lambs", "target": "Jonathan Demme" }
   ]
 }
 ```
 
 ### Processing (Frontend Logic):
 ```javascript
-// Extract unique nodes
-Movies: ["The Silence of the Lambs"]
-Genres: ["Thriller", "Crime", "Drama"]
-Directors: ["Jonathan Demme"]
+// Receive nodes and links directly from backend
+const graphData = await fetch('http://localhost:8000/api/v1/graph').then(r => r.json());
 
-// Create graph structure
-Nodes: [
-  { id: "The Silence of the Lambs", type: "movie", ... },
-  { id: "Thriller", type: "genre" },
-  { id: "Crime", type: "genre" },
-  { id: "Drama", type: "genre" },
-  { id: "Jonathan Demme", type: "director" }
-]
+// Extract movie nodes for list view (if needed)
+const movieNodes = graphData.nodes.filter(n => n.type === 'movie');
+const movies = movieNodes.map(n => n.data);
 
-Edges: [
-  { source: "The Silence of the Lambs", target: "Thriller" },
-  { source: "The Silence of the Lambs", target: "Crime" },
-  { source: "The Silence of the Lambs", target: "Drama" },
-  { source: "The Silence of the Lambs", target: "Jonathan Demme" }
-]
+// Pass graphData directly to ForceGraph2D component
+<ForceGraph2D graphData={graphData} ... />
 ```
 
 ### Output (Visual Graph):
@@ -226,9 +248,10 @@ Edges: [
                    |
                    |
     Jonathan Demme ─── The Silence of the Lambs ─── Crime
-                              |
-                            Drama
+                              
 ```
+
+**Note**: The backend pre-computes the graph structure, so frontend just renders it directly!
 
 ---
 
@@ -347,20 +370,24 @@ backdrop_url: "https://image.tmdb.org/t/p/w1280/[path].jpg"
 ## 📞 Communication Flow
 
 ```
-ML Team                    Frontend Team
+Backend Team               Frontend Team
    │                            │
-   │  1. "API is ready" ────────►
+   │  1. Backend setup done ────►
+   │  (FastAPI + Neo4j)         │
    │                            │
-   │  2. Share endpoint URL     │
-   │  3. Share sample response  │
+   │  2. Populate Neo4j DB      │
+   │     with movie data        │
    │                            │
-   │ ◄──── 4. Test integration  │
+   │  3. Test /api/v1/graph ────►
    │                            │
-   │  5. Fix any issues ────────►
+   │ ◄──── 4. Frontend connects │
+   │ ◄──── 5. Test integration  │
    │                            │
-   │ ◄──── 6. Confirm working   │
+   │  6. Add more movies/data   │
    │                            │
-   │  7. Deploy to production   │
+   │ ◄──── 7. Confirm working   │
+   │                            │
+   │  8. Deploy both services   │
    │                            │
 ```
 

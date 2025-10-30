@@ -1,15 +1,23 @@
 # ML API Specification & Integration Guide
 
 ## Overview
-This document specifies the expected API format from the ML team for the Film Whisperer movie recommendation system.
+This document specifies the API format for the Film Whisperer movie recommendation system. The backend is built with **FastAPI** and uses **Neo4j** graph database for storing and querying movie relationships.
 
 ---
 
-## API Endpoint
+## API Base URL
 
-### **POST** `/api/recommend`
+```
+http://localhost:8000/api/v1
+```
 
-The frontend will send a user's movie query and expect recommendations in return.
+---
+
+## API Endpoints
+
+### **GET** `/api/v1/graph`
+
+Returns the complete knowledge graph with movie nodes and their relationships (genres, directors, etc.).
 
 ---
 
@@ -17,32 +25,29 @@ The frontend will send a user's movie query and expect recommendations in return
 
 ### Endpoint URL
 ```
-POST https://your-ml-backend.com/api/recommend
+GET http://localhost:8000/api/v1/graph
 ```
 
 ### Request Headers
 ```json
 {
-  "Content-Type": "application/json"
+  "Accept": "application/json"
 }
 ```
 
-### Request Body
-```json
-{
-  "query": "string",           // User's search query (movie title or description)
-  "num_recommendations": 10,   // Optional: Number of recommendations to return (default: 10)
-  "include_similar": true      // Optional: Include similarity explanations (default: true)
-}
+### Request Parameters
+**None** - This is a simple GET request that returns the full graph.
+
+### Example Request (cURL)
+```bash
+curl http://localhost:8000/api/v1/graph
 ```
 
-### Example Request
-```json
-{
-  "query": "Dark psychological thriller like Seven",
-  "num_recommendations": 10,
-  "include_similar": true
-}
+### Example Request (JavaScript)
+```javascript
+fetch('http://localhost:8000/api/v1/graph')
+  .then(res => res.json())
+  .then(data => console.log(data));
 ```
 
 ---
@@ -50,197 +55,185 @@ POST https://your-ml-backend.com/api/recommend
 ## 2. Response Format
 
 ### Response Structure
+The backend returns a **GraphResponse** object with nodes and links:
+
 ```json
 {
-  "status": "success",           // "success" or "error"
-  "query": "string",             // Echo back the original query
-  "search_movie": {              // Optional: The movie user searched for (if applicable)
-    "title": "string",
-    "year": 0,
-    "tmdb_id": 0                // TMDB ID for fetching additional data
-  },
-  "recommended_movies": [        // Array of recommended movies
+  "nodes": [                     // Array of node objects
     {
-      "title": "string",         // Movie title
-      "year": 0,                 // Release year
-      "director": "string",      // Director name
-      "genres": ["string"],      // Array of genre names
-      "plot_summary": "string",  // Brief plot description
-      "similarity_score": 0.0,   // Float between 0.0-1.0 (e.g., 0.91)
-      "reason_for_recommendation": [  // Array of reason strings
-        "string",
-        "string",
-        "string"
-      ],
-      "tmdb_id": 0,              // TMDB movie ID (optional, for fetching real-time data)
-      "poster_url": "string",    // Optional: Direct poster URL if available
-      "trailer_url": "string"    // Optional: YouTube trailer URL
+      "id": "string",            // Unique identifier (e.g., "Inception", "Sci-Fi", "Christopher Nolan")
+      "name": "string",          // Display name (same as id)
+      "type": "string",          // Node type: "movie", "genre", "director"
+      "data": {                  // Optional: Additional data for the node
+        "title": "string",       // For movie nodes
+        "year": 0,               // For movie nodes
+        "director": "string",    // For movie nodes
+        "genres": ["string"],    // For movie nodes
+        "plot_summary": "string",// For movie nodes
+        "poster_url": "string",  // For movie nodes
+        "trailer_url": "string", // For movie nodes
+        "similarity_score": 0.0, // For movie nodes (0.0-1.0)
+        "reason_for_recommendation": ["string"] // For movie nodes
+      }
     }
   ],
-  "graph_data": {                // Graph structure for visualization
-    "nodes": [
-      {
-        "id": "string",          // Unique identifier (movie title or genre)
-        "name": "string",        // Display name
-        "type": "string",        // "movie", "genre", "director", "actor", "theme"
-        "properties": {}         // Optional: Additional properties
-      }
-    ],
-    "edges": [
-      {
-        "source": "string",      // Node ID (source)
-        "target": "string",      // Node ID (target)
-        "weight": 0.0,           // Connection strength (0.0-1.0)
-        "relation": "string"     // Relationship type: "has_genre", "directed_by", "similar_to"
-      }
-    ]
-  },
-  "metadata": {                  // Optional: Additional metadata
-    "processing_time": 0.0,      // Time taken to generate recommendations (seconds)
-    "model_version": "string",   // ML model version used
-    "total_movies_analyzed": 0   // Number of movies in the database
-  }
+  "links": [                     // Array of link objects (relationships)
+    {
+      "source": "string",        // Node ID (source)
+      "target": "string"         // Node ID (target)
+    }
+  ]
 }
 ```
+
+### Key Differences from Traditional APIs:
+- ✅ **No separate movie list** - Movies are embedded in the graph as nodes
+- ✅ **Simple structure** - Just nodes and links (edges)
+- ✅ **Graph-first design** - Relationships are first-class citizens
+- ✅ **Flexible data** - Movie details stored in node's `data` field
 
 ---
 
 ## 3. Complete Example Response
 
+### Simple Example (Currently Implemented)
 ```json
 {
-  "status": "success",
-  "query": "Dark psychological thriller like Seven",
-  "search_movie": {
-    "title": "Se7en",
-    "year": 1995,
-    "tmdb_id": 807
-  },
-  "recommended_movies": [
+  "nodes": [
     {
-      "title": "The Silence of the Lambs",
-      "year": 1991,
-      "director": "Jonathan Demme",
-      "genres": ["Thriller", "Crime", "Drama"],
-      "plot_summary": "A young FBI cadet must receive the help of an incarcerated and manipulative cannibal killer to help catch another serial killer.",
-      "similarity_score": 0.88,
-      "reason_for_recommendation": [
-        "Iconic psychological thriller",
-        "Serial killer investigation theme",
-        "Mind games and suspense elements"
-      ],
-      "tmdb_id": 274,
-      "poster_url": "https://image.tmdb.org/t/p/w500/uS9m8OBk1A8eM9I042bx8XXpqAq.jpg",
-      "trailer_url": "https://www.youtube.com/watch?v=W6Mm8Sbe__o"
+      "id": "Inception",
+      "name": "Inception",
+      "type": "movie",
+      "data": {
+        "title": "Inception",
+        "year": 2010
+      }
     },
     {
-      "title": "Zodiac",
-      "year": 2007,
-      "director": "David Fincher",
-      "genres": ["Mystery", "Thriller", "Crime"],
-      "plot_summary": "A San Francisco cartoonist becomes obsessed with tracking down the Zodiac Killer.",
-      "similarity_score": 0.85,
-      "reason_for_recommendation": [
-        "Same director: David Fincher",
-        "Real-life serial killer investigation",
-        "Atmospheric and methodical pacing"
-      ],
-      "tmdb_id": 1949,
-      "poster_url": "https://image.tmdb.org/t/p/w500/yMF3XMJLq4qkn4fqOzwW2wFDMMG.jpg",
-      "trailer_url": "https://www.youtube.com/watch?v=yNncHPl1UXg"
+      "id": "Sci-Fi",
+      "name": "Sci-Fi",
+      "type": "genre",
+      "data": null
+    },
+    {
+      "id": "Christopher Nolan",
+      "name": "Christopher Nolan",
+      "type": "director",
+      "data": null
     }
   ],
-  "graph_data": {
-    "nodes": [
-      {
-        "id": "movie_274",
-        "name": "The Silence of the Lambs",
-        "type": "movie",
-        "properties": {
-          "year": 1991,
-          "similarity_score": 0.88
-        }
-      },
-      {
-        "id": "movie_1949",
-        "name": "Zodiac",
-        "type": "movie",
-        "properties": {
-          "year": 2007,
-          "similarity_score": 0.85
-        }
-      },
-      {
-        "id": "genre_thriller",
-        "name": "Thriller",
-        "type": "genre"
-      },
-      {
-        "id": "genre_crime",
-        "name": "Crime",
-        "type": "genre"
-      },
-      {
-        "id": "director_fincher",
-        "name": "David Fincher",
-        "type": "director"
-      },
-      {
-        "id": "theme_serial_killer",
-        "name": "Serial Killer",
-        "type": "theme"
+  "links": [
+    {
+      "source": "Inception",
+      "target": "Sci-Fi"
+    },
+    {
+      "source": "Inception",
+      "target": "Christopher Nolan"
+    }
+  ]
+}
+```
+
+### Full Example (With Complete Movie Data)
+```json
+{
+  "nodes": [
+    {
+      "id": "The Silence of the Lambs",
+      "name": "The Silence of the Lambs",
+      "type": "movie",
+      "data": {
+        "title": "The Silence of the Lambs",
+        "year": 1991,
+        "director": "Jonathan Demme",
+        "genres": ["Thriller", "Crime", "Drama"],
+        "plot_summary": "A young FBI cadet must receive the help of an incarcerated and manipulative cannibal killer to help catch another serial killer.",
+        "poster_url": "https://image.tmdb.org/t/p/w500/uS9m8OBk1A8eM9I042bx8XXpqAq.jpg",
+        "trailer_url": "https://www.youtube.com/watch?v=W6Mm8Sbe__o",
+        "similarity_score": 0.88,
+        "reason_for_recommendation": [
+          "Iconic psychological thriller",
+          "Serial killer investigation theme",
+          "Mind games and suspense elements"
+        ]
       }
-    ],
-    "edges": [
-      {
-        "source": "movie_274",
-        "target": "genre_thriller",
-        "weight": 1.0,
-        "relation": "has_genre"
-      },
-      {
-        "source": "movie_274",
-        "target": "genre_crime",
-        "weight": 1.0,
-        "relation": "has_genre"
-      },
-      {
-        "source": "movie_1949",
-        "target": "genre_thriller",
-        "weight": 1.0,
-        "relation": "has_genre"
-      },
-      {
-        "source": "movie_1949",
-        "target": "director_fincher",
-        "weight": 1.0,
-        "relation": "directed_by"
-      },
-      {
-        "source": "movie_274",
-        "target": "theme_serial_killer",
-        "weight": 0.9,
-        "relation": "has_theme"
-      },
-      {
-        "source": "movie_1949",
-        "target": "theme_serial_killer",
-        "weight": 0.95,
-        "relation": "has_theme"
-      },
-      {
-        "source": "movie_274",
-        "target": "movie_1949",
-        "weight": 0.82,
-        "relation": "similar_to"
+    },
+    {
+      "id": "Zodiac",
+      "name": "Zodiac",
+      "type": "movie",
+      "data": {
+        "title": "Zodiac",
+        "year": 2007,
+        "director": "David Fincher",
+        "genres": ["Mystery", "Thriller", "Crime"],
+        "plot_summary": "A San Francisco cartoonist becomes obsessed with tracking down the Zodiac Killer.",
+        "poster_url": "https://image.tmdb.org/t/p/w500/yMF3XMJLq4qkn4fqOzwW2wFDMMG.jpg",
+        "trailer_url": "https://www.youtube.com/watch?v=yNncHPl1UXg",
+        "similarity_score": 0.85,
+        "reason_for_recommendation": [
+          "Same director: David Fincher",
+          "Real-life serial killer investigation",
+          "Atmospheric and methodical pacing"
+        ]
       }
-    ]
-  },
-  "metadata": {
-    "processing_time": 1.23,
-    "model_version": "v2.1.0",
-    "total_movies_analyzed": 15000
-  }
+    },
+    {
+      "id": "Thriller",
+      "name": "Thriller",
+      "type": "genre",
+      "data": null
+    },
+    {
+      "id": "Crime",
+      "name": "Crime",
+      "type": "genre",
+      "data": null
+    },
+    {
+      "id": "David Fincher",
+      "name": "David Fincher",
+      "type": "director",
+      "data": null
+    },
+    {
+      "id": "Jonathan Demme",
+      "name": "Jonathan Demme",
+      "type": "director",
+      "data": null
+    }
+  ],
+  "links": [
+    {
+      "source": "The Silence of the Lambs",
+      "target": "Thriller"
+    },
+    {
+      "source": "The Silence of the Lambs",
+      "target": "Crime"
+    },
+    {
+      "source": "The Silence of the Lambs",
+      "target": "Jonathan Demme"
+    },
+    {
+      "source": "Zodiac",
+      "target": "Thriller"
+    },
+    {
+      "source": "Zodiac",
+      "target": "Crime"
+    },
+    {
+      "source": "Zodiac",
+      "target": "David Fincher"
+    },
+    {
+      "source": "The Silence of the Lambs",
+      "target": "Zodiac"
+    }
+  ]
 }
 ```
 
@@ -248,25 +241,32 @@ POST https://your-ml-backend.com/api/recommend
 
 ## 4. Error Response Format
 
+FastAPI returns standard HTTP error responses:
+
+### 404 Not Found
 ```json
 {
-  "status": "error",
-  "error_code": "string",        // Error code (e.g., "MOVIE_NOT_FOUND", "INVALID_QUERY")
-  "message": "string",           // Human-readable error message
-  "details": {}                  // Optional: Additional error details
+  "detail": "Not Found"
 }
 ```
 
-### Example Error Response
+### 500 Internal Server Error
 ```json
 {
-  "status": "error",
-  "error_code": "MOVIE_NOT_FOUND",
-  "message": "No movies found matching your query",
-  "details": {
-    "query": "Dark psychological thriller like Seven",
-    "suggestions": ["Try different keywords", "Check spelling"]
-  }
+  "detail": "Internal Server Error"
+}
+```
+
+### 422 Validation Error
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "field_name"],
+      "msg": "field required",
+      "type": "value_error.missing"
+    }
+  ]
 }
 ```
 
@@ -276,35 +276,34 @@ POST https://your-ml-backend.com/api/recommend
 
 ### 5.1 **Graph Visualization**
 
-The `graph_data` is displayed as an **interactive force-directed graph** using `react-force-graph-2d`:
+The response's `nodes` and `links` arrays are displayed directly as an **interactive force-directed graph** using `react-force-graph-2d`:
 
 #### Node Types & Colors:
-- **Movies** (Red, `hsl(0, 73%, 51%)`) - Larger nodes (8px)
-- **Genres** (Orange, `hsl(38, 92%, 50%)`) - Medium nodes (5px)
-- **Directors** (Gray, `hsl(0, 0%, 65%)`) - Medium nodes (5px)
-- **Themes/Actors** (Blue/Custom) - Can be added as needed
+- **Movies** (Red, `hsl(0, 73%, 51%)`) - Larger nodes (8px) - `type: "movie"`
+- **Genres** (Orange, `hsl(38, 92%, 50%)`) - Medium nodes (5px) - `type: "genre"`
+- **Directors** (Gray, `hsl(0, 0%, 65%)`) - Medium nodes (5px) - `type: "director"`
 
-#### Edges/Links:
-- Connect movies to genres, directors, themes, and other movies
-- Line thickness can represent `weight` (connection strength)
-- Different colors for different `relation` types
+#### Links:
+- Simple connections between nodes
+- All links are displayed with the same style (can be customized later)
+- Connect movies to their genres and directors
 
 #### Interactions:
-- **Click on movie nodes**: Opens modal with detailed movie information
-- **Hover**: Shows node name/label
+- **Click on movie nodes**: Opens modal with movie details from `node.data`
+- **Hover**: Shows node name
 - **Drag**: Repositions nodes
 - **Zoom/Pan**: Navigate the graph
 
 ### 5.2 **Movie Modal (Detail View)**
 
-When a movie node is clicked, we show:
+When a movie node (where `type === "movie"`) is clicked:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  [X Close]                                              │
 │                                                         │
 │  ┌──────────┐     MOVIE TITLE                         │
-│  │          │     Tagline (if available)               │
+│  │          │     Tagline (if from TMDB)               │
 │  │  Poster  │     Year • Director • Runtime • ⭐ Rating│
 │  │  Image   │                                          │
 │  │          │     [Genre] [Genre] [Genre]             │
@@ -321,67 +320,84 @@ When a movie node is clicked, we show:
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Data Mapping:**
-- Title → `recommended_movies[].title`
-- Poster → `recommended_movies[].poster_url` or TMDB fetch
-- Year → `recommended_movies[].year`
-- Director → `recommended_movies[].director`
-- Genres → `recommended_movies[].genres[]`
-- Plot → `recommended_movies[].plot_summary`
-- Rating → `recommended_movies[].similarity_score` (shown as %)
-- Reasons → `recommended_movies[].reason_for_recommendation[]`
-- Trailer → `recommended_movies[].trailer_url`
+**Data Mapping from Node:**
+- Title → `node.data.title`
+- Poster → `node.data.poster_url` or fetch from TMDB
+- Year → `node.data.year`
+- Director → `node.data.director`
+- Genres → `node.data.genres[]`
+- Plot → `node.data.plot_summary`
+- Rating → `node.data.similarity_score` (shown as %)
+- Reasons → `node.data.reason_for_recommendation[]`
+- Trailer → `node.data.trailer_url`
 
-### 5.3 **Search Results**
+### 5.3 **Data Flow**
 
-After search, we display:
-1. **Hero section** with search query
-2. **Graph visualization** with all recommended movies
-3. **Similarity scores** shown as percentage (0.88 → 88%)
-4. **Toast notifications** for loading states
+1. Frontend calls `GET /api/v1/graph`
+2. Backend returns `{ nodes: [...], links: [...] }`
+3. Frontend extracts movie nodes (where `type === "movie"`)
+4. Graph is rendered with all nodes and links
+5. User clicks movie node → Modal shows `node.data` details
+6. Optional: Frontend fetches additional data from TMDB API
 
 ---
 
 ## 6. Data Flow
 
 ```
-User Input → Frontend Search
+Frontend Loads/Searches
      ↓
-POST /api/recommend (your ML API)
+GET /api/v1/graph
      ↓
-ML Model processes & returns JSON
+Backend queries Neo4j database
      ↓
-Frontend receives response
+Returns { nodes: [...], links: [...] }
      ↓
-├─ Extracts recommended_movies[]
-├─ Builds graph from graph_data
-├─ Renders interactive visualization
-└─ On click → Fetch TMDB data (optional enrichment)
+Frontend receives graph
+     ↓
+├─ Renders nodes as graph visualization
+├─ Displays links as connections
+└─ User clicks movie node
+     ↓
+Extract node.data for movie details
+     ↓
+Optional: Fetch additional data from TMDB
      ↓
 Display in Modal with full details
 ```
 
 ---
 
-## 7. Important Notes for ML Team
+## 7. Important Notes for Backend/ML Team
 
-### Must-Have Fields:
+### Backend Stack:
+✅ **FastAPI** - Python web framework  
+✅ **Neo4j** - Graph database for storing movie relationships  
+✅ **Pydantic** - Data validation using models  
+✅ **CORS enabled** - Frontend can access from localhost:8080  
+
+### Must-Have Fields in Node Data (for movie nodes):
 ✅ `title` - Exact movie title (important for TMDB matching)  
-✅ `year` - Release year  
-✅ `genres[]` - Array of genres  
+✅ `year` - Release year (integer)  
+✅ `genres` - Array of genre strings  
 ✅ `similarity_score` - Float 0.0-1.0  
-✅ `reason_for_recommendation[]` - At least 2-3 reasons  
+✅ `reason_for_recommendation` - Array of reason strings (at least 2-3)  
 
-### Optional But Recommended:
-🔸 `tmdb_id` - Makes TMDB fetching more accurate  
-🔸 `graph_data` - If not provided, we auto-generate from movies/genres/directors  
+### Optional But Recommended Fields:
+🔸 `director` - Director name (string)  
+🔸 `plot_summary` - Brief plot description  
 🔸 `poster_url` - Direct URL saves API calls  
-🔸 `director` - Enhances graph connections  
+🔸 `trailer_url` - YouTube URL  
+
+### Node Types:
+- `"movie"` - Movie nodes (must have `data` field with movie details)
+- `"genre"` - Genre nodes (can have `data: null`)
+- `"director"` - Director nodes (can have `data: null`)
 
 ### Performance Requirements:
-- Response time: < 3 seconds (ideal)
+- Response time: < 2 seconds (ideal)
 - Max payload size: < 5MB
-- Support for 5-20 recommendations per request
+- Graph should contain 10-50 nodes for best visualization
 
 ### Similarity Score Guidelines:
 - `0.9-1.0` - Extremely similar (same franchise, sequels)
@@ -404,87 +420,156 @@ Display in Modal with full details
 ## 8. Testing the Integration
 
 ### Test Endpoint
-Once your API is ready, we'll test with:
+Test the backend with:
 
 ```bash
-curl -X POST https://your-api.com/api/recommend \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Dark psychological thriller",
-    "num_recommendations": 5
-  }'
+curl http://localhost:8000/api/v1/graph
 ```
 
-### Sample Test Cases:
-1. **Specific movie**: "Movies like Inception"
-2. **Genre-based**: "Romantic comedies"
-3. **Description**: "Dark psychological thrillers with twist endings"
-4. **Director**: "Christopher Nolan movies"
-5. **Actor**: "Movies with Tom Hanks"
+### Test with Python
+```python
+import requests
+
+response = requests.get('http://localhost:8000/api/v1/graph')
+print(response.json())
+```
+
+### Test with JavaScript
+```javascript
+fetch('http://localhost:8000/api/v1/graph')
+  .then(res => res.json())
+  .then(data => console.log(data))
+  .catch(err => console.error(err));
+```
+
+### Sample Test Cases for Neo4j Queries:
+1. **Get all movies** with their genres and directors
+2. **Find similar movies** based on shared genres/directors
+3. **Get movies by specific genre** (e.g., "Thriller")
+4. **Get movies by specific director** (e.g., "Christopher Nolan")
+5. **Find shortest path** between two movies
 
 ---
 
 ## 9. Frontend Integration Points
 
-### Files to Update (Once ML API is Ready):
-1. **`src/pages/Index.tsx`** - Update `handleSearch()` function:
+### Files to Update:
+
+1. **`src/pages/Index.tsx`** - Update to fetch from backend:
 ```typescript
 const handleSearch = async (query: string) => {
   setLoading(true);
   try {
-    const response = await fetch('YOUR_ML_API_URL/api/recommend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, num_recommendations: 10 })
-    });
-    const data = await response.json();
+    const response = await fetch('http://localhost:8000/api/v1/graph');
+    const graphData = await response.json();
     
-    if (data.status === 'success') {
-      setMovies(data.recommended_movies);
-      setHasSearched(true);
-    }
+    // Extract movie nodes from graph
+    const movieNodes = graphData.nodes.filter(node => node.type === 'movie');
+    const movies = movieNodes.map(node => node.data);
+    
+    setMovies(movies);
+    setGraphData(graphData); // Store full graph for visualization
+    setHasSearched(true);
   } catch (error) {
-    console.error('Search failed:', error);
+    console.error('Failed to fetch graph:', error);
   } finally {
     setLoading(false);
   }
 };
 ```
 
-2. **Create `src/services/mlApi.ts`** - Centralized API service
-3. **Update `src/components/GraphSection.tsx`** - Use ML graph_data if provided
+2. **`src/components/GraphSection.tsx`** - Already compatible!
+   - Currently auto-generates graph from movies array
+   - Can be updated to use `graphData` prop directly
+
+3. **Create `src/services/backendApi.ts`** - Centralized API service:
+```typescript
+const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+export async function fetchGraph() {
+  const response = await fetch(`${API_BASE_URL}/graph`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch graph');
+  }
+  return response.json();
+}
+```
 
 ---
 
 ## 10. Fallback & Error Handling
 
 ### Scenarios We Handle:
-- ❌ ML API is down → Show cached/dummy data
-- ❌ No results found → Show popular movies
+- ❌ Backend API is down → Show cached/dummy data
+- ❌ Neo4j connection fails → Show error message
 - ❌ Slow response → Show loading skeleton
 - ❌ Invalid data format → Use fallback structure
-- ❌ TMDB fetch fails → Use ML-provided data
+- ❌ TMDB fetch fails → Use backend-provided data
 
 ---
 
-## Questions for ML Team?
+## 11. Backend Setup Instructions
+
+### Prerequisites:
+1. Python 3.8+
+2. Neo4j database (local or cloud)
+
+### Installation:
+```bash
+cd film-whisperer-backend
+pip install -r requirements.txt
+```
+
+### Configuration:
+Create `.env` file:
+```bash
+FRONTEND_URL=http://localhost:8080
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
+```
+
+### Run Backend:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+### Access API Docs:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+---
+
+## Questions for Backend/ML Team?
 
 Contact: [Your Name/Team]  
 Email: [Your Email]  
 Slack: [Channel]  
 
-**Timeline**: Please have API ready by [DATE]  
-**Documentation**: Please provide Swagger/OpenAPI spec  
-**Testing**: We need access to staging environment
+**Timeline**: Backend is already set up! Focus on populating Neo4j with movie data  
+**Documentation**: FastAPI auto-generates docs at /docs  
+**Testing**: Use http://localhost:8000/api/v1/graph
 
 ---
 
-## Appendix: Graph Data Auto-Generation
+## Appendix: Neo4j Data Model
 
-If ML team doesn't provide `graph_data`, we auto-generate it from:
-- Movies → Create movie nodes
-- Genres → Extract unique genres, create nodes
-- Directors → Extract unique directors, create nodes
-- Links → Connect movies to their genres and directors
+### Recommended Neo4j Schema:
 
-This is already implemented in `GraphSection.tsx` but a pre-computed graph from ML is preferred for better relationship representation.
+**Nodes:**
+- `(:Movie {title, year, director, plot_summary, poster_url, trailer_url, similarity_score})`
+- `(:Genre {name})`
+- `(:Director {name})`
+
+**Relationships:**
+- `(:Movie)-[:HAS_GENRE]->(:Genre)`
+- `(:Movie)-[:DIRECTED_BY]->(:Director)`
+- `(:Movie)-[:SIMILAR_TO {score}]->(:Movie)`
+
+### Sample Cypher Query:
+```cypher
+// Get all movies with their relationships
+MATCH (m:Movie)-[r]-(n)
+RETURN m, r, n
+LIMIT 50
+```

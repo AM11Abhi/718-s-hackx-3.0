@@ -1,141 +1,178 @@
-# 📚 ML Integration Documentation Index
+# 📚 Backend Integration Documentation Index
 
-This folder contains complete documentation for integrating the ML recommendation API with the Film Whisperer frontend.
+This folder contains complete documentation for the Film Whisperer backend (FastAPI + Neo4j) and frontend integration.
 
 ---
 
 ## 📄 Documentation Files
 
 ### 1. **ML_API_SPECIFICATION.md** - Complete Technical Spec
-   **Read this first if you're on the ML team**
+   **Read this first if you're working on the backend/ML**
    
    Contains:
-   - ✅ Complete API request/response format
-   - ✅ All field definitions and types
-   - ✅ Graph data structure specification
-   - ✅ Error handling requirements
-   - ✅ Performance guidelines
+   - ✅ FastAPI backend structure
+   - ✅ GET /api/v1/graph endpoint specification
+   - ✅ Node and Link data structure
+   - ✅ Neo4j integration guidelines
+   - ✅ Performance requirements
    - ✅ Testing procedures
    
-   **Who needs this**: ML engineers, Backend developers
+   **Who needs this**: Backend engineers, ML engineers, Full-stack developers
 
 ---
 
 ### 2. **ML_VISUAL_GUIDE.md** - Visual Flow & Display Logic
-   **Read this to understand how data is displayed**
+   **Read this to understand how data flows from Neo4j to UI**
    
    Contains:
    - ✅ Visual data flow diagrams
    - ✅ Graph node type explanations
-   - ✅ UI component mappings
+   - ✅ Backend → Frontend data mapping
    - ✅ Similarity score displays
-   - ✅ Real examples with screenshots
+   - ✅ Real examples
    
-   **Who needs this**: Frontend developers, UI/UX designers, ML team (to understand context)
+   **Who needs this**: Frontend developers, UI/UX designers, Backend team (to understand context)
 
 ---
 
 ### 3. **ML_INTEGRATION_TEMPLATE.md** - Quick Start Guide
-   **Read this for rapid integration**
+   **Read this for rapid setup and testing**
    
    Contains:
    - ✅ Minimum viable response format
+   - ✅ Backend setup instructions
+   - ✅ Neo4j data population examples
    - ✅ Quick testing commands (cURL, Python, JS)
    - ✅ Validation checklist
    - ✅ Common mistakes to avoid
-   - ✅ Sample test queries
-   - ✅ Validation script
    
-   **Who needs this**: ML team getting started, QA testers
+   **Who needs this**: Backend/ML team getting started, QA testers
 
 ---
 
 ## 🚀 Quick Start for Different Roles
 
+### For Backend Engineers:
+1. Backend is already set up in `film-whisperer-backend/` folder
+2. Read `ML_API_SPECIFICATION.md` (complete backend specs)
+3. Set up Neo4j database
+4. Use `ML_INTEGRATION_TEMPLATE.md` (populate data and test)
+5. Start backend: `uvicorn app.main:app --reload --port 8000`
+
 ### For ML Engineers:
-1. Read `ML_API_SPECIFICATION.md` (complete specs)
-2. Skim `ML_VISUAL_GUIDE.md` (see how it's displayed)
-3. Use `ML_INTEGRATION_TEMPLATE.md` (test your implementation)
-4. Validate your response format
-5. Share endpoint with frontend team
+1. Backend structure is ready - focus on Neo4j data population
+2. Read `ML_API_SPECIFICATION.md` (understand node/link structure)
+3. Populate Neo4j with movie similarity data
+4. Use Cypher queries to create nodes and relationships
+5. Test with `http://localhost:8000/api/v1/graph`
 
 ### For Frontend Developers:
-1. Read `ML_VISUAL_GUIDE.md` (understand data flow)
-2. Reference `ML_API_SPECIFICATION.md` (when integrating)
-3. Update API calls in `src/pages/Index.tsx`
-4. Test with ML staging endpoint
-5. Handle errors gracefully
+1. Backend API is at `http://localhost:8000/api/v1/graph`
+2. Read `ML_VISUAL_GUIDE.md` (understand data flow)
+3. Reference `ML_API_SPECIFICATION.md` (when integrating)
+4. Update API calls in `src/pages/Index.tsx`
+5. Graph component already supports the format!
 
 ### For Project Managers:
 1. Skim all three documents
-2. Understand the integration points
+2. Understand the integration is mostly done
 3. Track completion of each phase:
-   - [ ] ML API development
-   - [ ] Frontend integration
+   - [x] Backend setup (FastAPI + Neo4j)
+   - [ ] Neo4j data population
+   - [ ] Frontend API integration
    - [ ] Testing and validation
    - [ ] Production deployment
 
 ### For QA Testers:
-1. Use `ML_INTEGRATION_TEMPLATE.md` for test cases
-2. Validate response formats
-3. Test edge cases and errors
-4. Verify UI displays correctly
+1. Start backend: `cd film-whisperer-backend && uvicorn app.main:app --reload`
+2. Test endpoint: `curl http://localhost:8000/api/v1/graph`
+3. Use `ML_INTEGRATION_TEMPLATE.md` for test cases
+4. Validate response format matches spec
+5. Verify UI displays correctly
 
 ---
 
 ## 📋 Integration Checklist
 
-### ML Team Deliverables:
-- [ ] API endpoint URL (staging)
-- [ ] API endpoint URL (production)
-- [ ] Authentication details (if any)
-- [ ] Sample responses for all test cases
-- [ ] Error code documentation
-- [ ] Rate limit information
-- [ ] Expected response times
-- [ ] Monitoring/status page
+### Backend Team Deliverables:
+- [x] FastAPI backend setup
+- [x] Neo4j client configuration
+- [x] GET /api/v1/graph endpoint
+- [x] CORS configuration
+- [x] Pydantic models (Node, Link, GraphResponse)
+- [ ] Neo4j database populated with movie data
+- [ ] Environment variables configured
+- [ ] Backend deployed and accessible
+
+### ML/Data Team Deliverables:
+- [ ] Neo4j database schema designed
+- [ ] Movie nodes with complete data
+- [ ] Genre and Director nodes
+- [ ] Relationships (HAS_GENRE, DIRECTED_BY, SIMILAR_TO)
+- [ ] Similarity scores calculated
+- [ ] Recommendation reasons generated
+- [ ] Test data (at least 20-50 movies)
 
 ### Frontend Team Deliverables:
-- [ ] API service integration (`src/services/mlApi.ts`)
+- [ ] API service integration (`src/services/backendApi.ts`)
+- [ ] Update Index.tsx to fetch from backend
 - [ ] Loading states
 - [ ] Error handling
-- [ ] Graph rendering with ML data
-- [ ] Modal display enhancements
+- [ ] Graph rendering with backend data
+- [ ] Modal display with node.data
 - [ ] Analytics tracking
-- [ ] Unit tests
 - [ ] Integration tests
 
 ---
 
 ## 🔗 Key Integration Points
 
-### 1. Search Handler
-**File**: `src/pages/Index.tsx`
+### 1. Backend API Endpoint
+**File**: `film-whisperer-backend/app/routes.py`
+
+```python
+@router.get("/graph", response_model=GraphResponse)
+async def get_graph():
+    graph = fetch_graph()  # Queries Neo4j
+    return graph
+```
+
+### 2. Neo4j Client
+**File**: `film-whisperer-backend/app/neo4j_client.py`
+
+```python
+def fetch_graph() -> GraphResponse:
+    # TODO: Implement Neo4j query
+    # Query all movies, genres, directors
+    # Return as nodes and links
+    pass
+```
+
+### 3. Frontend API Call
+**File**: `src/pages/Index.tsx` (to be updated)
 
 ```typescript
 const handleSearch = async (query: string) => {
-  // Call ML API here
-  const response = await fetch('ML_API_URL/api/recommend', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query })
-  });
-  const data = await response.json();
-  setMovies(data.recommended_movies);
+  const response = await fetch('http://localhost:8000/api/v1/graph');
+  const graphData = await response.json();
+  
+  // Extract movies from graph
+  const movieNodes = graphData.nodes.filter(n => n.type === 'movie');
+  setMovies(movieNodes.map(n => n.data));
 };
 ```
 
-### 2. Graph Visualization
+### 4. Graph Visualization
 **File**: `src/components/GraphSection.tsx`
 
-- Receives `movies` array from ML API
-- Auto-generates graph structure OR uses `graph_data` if provided
+- Already compatible with nodes/links format!
+- Pass `graphData` directly to ForceGraph2D
 - Renders interactive force-directed graph
 
-### 3. Movie Modal
+### 5. Movie Modal
 **File**: `src/components/MovieModal.tsx`
 
-- Displays individual movie details
+- Displays `node.data` when movie node clicked
 - Can enrich data with TMDB API
 - Shows similarity scores and recommendations
 
@@ -144,19 +181,27 @@ const handleSearch = async (query: string) => {
 ## 🎯 Data Flow Summary
 
 ```
-User Query → Frontend → ML API → Response
-                                    ↓
-                          Parse recommended_movies[]
-                                    ↓
-                          Build graph structure
-                                    ↓
-                          Render visualization
-                                    ↓
-                    User clicks movie → Modal
-                                    ↓
-                    Optional TMDB enrichment
-                                    ↓
-                          Display full details
+User Action → Frontend
+                ↓
+         GET /api/v1/graph
+                ↓
+        Backend (FastAPI)
+                ↓
+        Query Neo4j Database
+                ↓
+        Return {nodes, links}
+                ↓
+        Frontend receives graph
+                ↓
+        Render visualization
+                ↓
+    User clicks movie node
+                ↓
+    Extract node.data
+                ↓
+    Optional TMDB enrichment
+                ↓
+    Display in Modal
 ```
 
 ---
